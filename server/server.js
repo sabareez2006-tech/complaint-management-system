@@ -11,12 +11,14 @@ const pool = require("./config/database");
 const authRoutes = require("./routes/auth");
 const complaintRoutes = require("./routes/complaints");
 
+const initDB = require("./db_init");
+
 const app = express();
 
-app.use(cors({
-  origin: ["http://localhost:3000", "https://cms2026.netlify.app"],
-  credentials: true
-}));
+// Initialize Database Tables
+initDB();
+
+app.use(cors());
 app.use(express.json());
 
 // API Routes
