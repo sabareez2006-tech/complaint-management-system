@@ -13,7 +13,10 @@ const complaintRoutes = require("./routes/complaints");
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: ["http://localhost:3000", "https://cms2026.netlify.app"],
+  credentials: true
+}));
 app.use(express.json());
 
 // API Routes
