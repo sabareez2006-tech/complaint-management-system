@@ -41,11 +41,18 @@ function Admin() {
             <tr key={c.complaint_id}>
               <td>{c.complaint_id}</td>
               <td>{c.title}</td>
-              <td>{c.status}</td>
+              <td>
+                <span className={`status ${c.status ? c.status.toLowerCase() : ""}`}>
+                  {c.status}
+                </span>
+              </td>
               <td>{c.feedback || "-"}</td>
               <td>
-                {c.status === "pending" && (
-                  <button className="admin-btn" onClick={() => updateStatus(c.complaint_id)}>
+                {c.status && c.status.toLowerCase() === "pending" && (
+                  <button
+                    className="admin-btn"
+                    onClick={() => updateStatus(c.complaint_id)}
+                  >
                     Resolve
                   </button>
                 )}

@@ -63,9 +63,13 @@ function ComplaintList() {
                 <td>{c.title}</td>
                 <td>{c.category}</td>
                 <td>{c.priority}</td>
-                <td>{c.status}</td>
                 <td>
-                  {c.status === "resolved" && !c.feedback ? (
+                  <span className={`status ${c.status ? c.status.toLowerCase() : ""}`}>
+                    {c.status}
+                  </span>
+                </td>
+                <td>
+                  {c.status && c.status.toLowerCase() === "resolved" && !c.feedback ? (
                     <div style={{ display: "flex", gap: "10px" }}>
                       <input
                         type="text"
