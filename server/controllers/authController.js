@@ -94,8 +94,8 @@ const login = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("LOGIN ERROR:", error.message);
-    res.status(500).json({ error: "Server error" });
+    console.error("LOGIN ERROR DETAILED:", error);
+    res.status(500).json({ error: "Server error: " + error.message });
   }
 };
 
