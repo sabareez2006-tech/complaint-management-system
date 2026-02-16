@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS complaints (
     description   TEXT NOT NULL,
     category      VARCHAR(50) NOT NULL,
     priority      VARCHAR(20) DEFAULT 'medium',
-    status        VARCHAR(30) DEFAULT 'pending',
+    status        VARCHAR(30) DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'resolved')),
     location      VARCHAR(200),
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -75,6 +75,10 @@ CREATE TABLE IF NOT EXISTS complaints (
     assigned_to   INTEGER REFERENCES users(user_id),
     feedback      TEXT
 );
+
+-- Migration: Fix status constraint on existing databases
+ALTER TABLE complaints DROP CONSTRAINT IF EXISTS complaints_status_check;
+ALTER TABLE complaints ADD CONSTRAINT complaints_status_check CHECK (status IN ('pending', 'in_progress', 'resolved'));
 
 
 -- =========================
