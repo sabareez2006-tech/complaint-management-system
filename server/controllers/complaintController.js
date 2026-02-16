@@ -61,31 +61,49 @@ const updateComplaintStatus = async (req, res) => {
     const { status } = req.body;
 
     // Get old status for history
-    const oldResult = await pool.query(
-      `SELECT status FROM complaints WHERE complaint_id = $1`, [id]
-    );
-    const oldStatus = oldResult.rows.length > 0 ? oldResult.rows[0].status : null;
+    let oldStatus = null;
+    try {
+      const oldResult = await pool.query(
+        `SELECT status FROM complaints WHERE complaint_id = $1`, [id]
+      );
+      oldStatus = oldResult.rows.length > 0 ? oldResult.rows[0].status : null;
+    } catch (e) {
+      console.warn("Could not fetch old status:", e.message);
+    }
 
     let result;
-    if (status === 'resolved') {
+    try {
+      // Try full update with timestamp columns
+      if (status === 'resolved') {
+        result = await pool.query(
+          `UPDATE complaints
+           SET status = $1, resolved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+           WHERE complaint_id = $2
+           RETURNING *`,
+          [status, id]
+        );
+      } else {
+        result = await pool.query(
+          `UPDATE complaints
+           SET status = $1, resolved_at = NULL, updated_at = CURRENT_TIMESTAMP
+           WHERE complaint_id = $2
+           RETURNING *`,
+          [status, id]
+        );
+      }
+    } catch (colError) {
+      // Fallback: simple status-only update (if resolved_at/updated_at columns don't exist)
+      console.warn("Full update failed, using fallback:", colError.message);
       result = await pool.query(
         `UPDATE complaints
-         SET status = $1, resolved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-         WHERE complaint_id = $2
-         RETURNING *`,
-        [status, id]
-      );
-    } else {
-      result = await pool.query(
-        `UPDATE complaints
-         SET status = $1, resolved_at = NULL, updated_at = CURRENT_TIMESTAMP
+         SET status = $1
          WHERE complaint_id = $2
          RETURNING *`,
         [status, id]
       );
     }
 
-    // Record status change in history (non-blocking — table may not exist on all environments)
+    // Record status change in history (non-blocking)
     if (oldStatus && oldStatus !== status) {
       try {
         await pool.query(
