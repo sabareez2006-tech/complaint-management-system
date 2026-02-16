@@ -85,13 +85,17 @@ const updateComplaintStatus = async (req, res) => {
       );
     }
 
-    // Record status change in history
+    // Record status change in history (non-blocking — table may not exist on all environments)
     if (oldStatus && oldStatus !== status) {
-      await pool.query(
-        `INSERT INTO status_history (complaint_id, old_status, new_status, changed_by)
-         VALUES ($1, $2, $3, $4)`,
-        [id, oldStatus, status, req.user.userId]
-      );
+      try {
+        await pool.query(
+          `INSERT INTO status_history (complaint_id, old_status, new_status, changed_by)
+           VALUES ($1, $2, $3, $4)`,
+          [id, oldStatus, status, req.user.userId]
+        );
+      } catch (historyError) {
+        console.warn("Could not log status history:", historyError.message);
+      }
     }
 
     res.json({
