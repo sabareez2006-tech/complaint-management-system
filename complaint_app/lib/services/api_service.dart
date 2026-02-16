@@ -152,4 +152,22 @@ class ApiService {
     );
     return jsonDecode(response.body);
   }
+
+  // ==================== ANALYTICS ====================
+
+  static Future<Map<String, dynamic>> getAnalytics() async {
+    final headers = await _getHeaders();
+    final response = await http.get(
+      Uri.parse('$baseUrl/complaints/analytics'),
+      headers: headers,
+    );
+    return jsonDecode(response.body);
+  }
+
+  // ==================== USER INFO ====================
+
+  static Future<String?> getUserName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_name');
+  }
 }

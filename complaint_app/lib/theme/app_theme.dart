@@ -197,25 +197,41 @@ class AppTheme {
     );
   }
 
+  static const Color inProgressBlue = Color(0xFF60A5FA);
+
   static Widget statusBadge(String status) {
-    final isResolved = status.toLowerCase() == 'resolved';
+    Color bgColor;
+    Color textColor;
+    String label;
+
+    switch (status.toLowerCase()) {
+      case 'resolved':
+        bgColor = const Color(0x3334D399);
+        textColor = success;
+        label = 'RESOLVED';
+        break;
+      case 'in_progress':
+        bgColor = const Color(0x3360A5FA);
+        textColor = inProgressBlue;
+        label = 'IN PROGRESS';
+        break;
+      default:
+        bgColor = const Color(0x33FDE047);
+        textColor = warning;
+        label = 'PENDING';
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: isResolved
-            ? const Color(0x3334D399)
-            : const Color(0x33FDE047),
+        color: bgColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isResolved
-              ? const Color(0x4D34D399)
-              : const Color(0x4DFDE047),
-        ),
+        border: Border.all(color: textColor.withValues(alpha: 0.3)),
       ),
       child: Text(
-        status.toUpperCase(),
+        label,
         style: TextStyle(
-          color: isResolved ? success : warning,
+          color: textColor,
           fontSize: 11,
           fontWeight: FontWeight.w600,
         ),
