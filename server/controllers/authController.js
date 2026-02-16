@@ -40,6 +40,15 @@ const register = async (req, res) => {
       [username, full_name, email, hashedPassword, role]
     );
 
+    // If role is admin, also insert into admin table
+    if (role === "admin") {
+      await pool.query(
+        `INSERT INTO admin (name, email, password, role)
+         VALUES ($1, $2, $3, $4)`,
+        [full_name, email, hashedPassword, "admin"]
+      );
+    }
+
     res.status(201).json({
       message: "User registered successfully",
       user: result.rows[0],

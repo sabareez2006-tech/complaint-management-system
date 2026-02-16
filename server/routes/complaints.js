@@ -10,6 +10,7 @@ router.put("/:id/feedback", verifyToken, complaintController.addFeedback);
 
 // Admin
 router.get("/", verifyToken, isAdmin, complaintController.getAllComplaints);
+router.get("/analytics", verifyToken, isAdmin, complaintController.getAnalytics);
 router.put("/:id/status", verifyToken, isAdmin, complaintController.updateComplaintStatus);
 
 module.exports = router;

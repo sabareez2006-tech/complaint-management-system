@@ -60,13 +60,39 @@ const updateComplaintStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const result = await pool.query(
-      `UPDATE complaints
-       SET status = $1
-       WHERE complaint_id = $2
-       RETURNING *`,
-      [status, id]
+    // Get old status for history
+    const oldResult = await pool.query(
+      `SELECT status FROM complaints WHERE complaint_id = $1`, [id]
     );
+    const oldStatus = oldResult.rows.length > 0 ? oldResult.rows[0].status : null;
+
+    let result;
+    if (status === 'resolved') {
+      result = await pool.query(
+        `UPDATE complaints
+         SET status = $1, resolved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+         WHERE complaint_id = $2
+         RETURNING *`,
+        [status, id]
+      );
+    } else {
+      result = await pool.query(
+        `UPDATE complaints
+         SET status = $1, resolved_at = NULL, updated_at = CURRENT_TIMESTAMP
+         WHERE complaint_id = $2
+         RETURNING *`,
+        [status, id]
+      );
+    }
+
+    // Record status change in history
+    if (oldStatus && oldStatus !== status) {
+      await pool.query(
+        `INSERT INTO status_history (complaint_id, old_status, new_status, changed_by)
+         VALUES ($1, $2, $3, $4)`,
+        [id, oldStatus, status, req.user.userId]
+      );
+    }
 
     res.json({
       message: "Status updated",
@@ -107,10 +133,82 @@ const addFeedback = async (req, res) => {
   }
 };
 
+// GET ANALYTICS (ADMIN)
+const getAnalytics = async (req, res) => {
+  try {
+    // Total complaints
+    const totalResult = await pool.query(`SELECT COUNT(*) as total FROM complaints`);
+    const total = parseInt(totalResult.rows[0].total);
+
+    // Count by status
+    const statusResult = await pool.query(`
+      SELECT status, COUNT(*) as count FROM complaints GROUP BY status
+    `);
+    const byStatus = {};
+    statusResult.rows.forEach(row => {
+      byStatus[row.status] = parseInt(row.count);
+    });
+
+    // Count by category
+    const categoryResult = await pool.query(`
+      SELECT category, COUNT(*) as count FROM complaints GROUP BY category ORDER BY count DESC
+    `);
+    const byCategory = categoryResult.rows.map(row => ({
+      category: row.category,
+      count: parseInt(row.count),
+    }));
+
+    // Count by priority
+    const priorityResult = await pool.query(`
+      SELECT priority, COUNT(*) as count FROM complaints GROUP BY priority
+    `);
+    const byPriority = {};
+    priorityResult.rows.forEach(row => {
+      byPriority[row.priority] = parseInt(row.count);
+    });
+
+    // Recent complaints (last 7 days)
+    const recentResult = await pool.query(`
+      SELECT DATE(created_at) as date, COUNT(*) as count
+      FROM complaints
+      WHERE created_at >= NOW() - INTERVAL '7 days'
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `);
+    const recentTimeline = recentResult.rows.map(row => ({
+      date: row.date,
+      count: parseInt(row.count),
+    }));
+
+    // Average resolution time (for resolved complaints)
+    const avgTimeResult = await pool.query(`
+      SELECT AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600) as avg_hours
+      FROM complaints
+      WHERE status = 'resolved' AND resolved_at IS NOT NULL
+    `);
+    const avgResolutionHours = avgTimeResult.rows[0].avg_hours
+      ? parseFloat(avgTimeResult.rows[0].avg_hours).toFixed(1)
+      : null;
+
+    res.json({
+      total,
+      byStatus,
+      byCategory,
+      byPriority,
+      recentTimeline,
+      avgResolutionHours,
+    });
+  } catch (error) {
+    console.error("GET ANALYTICS ERROR:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   createComplaint,
   getMyComplaints,
   getAllComplaints,
   updateComplaintStatus,
-  addFeedback, // ✅ NEW
+  addFeedback,
+  getAnalytics,
 };

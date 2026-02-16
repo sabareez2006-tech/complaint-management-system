@@ -2,11 +2,11 @@ const pool = require('./config/database');
 const bcrypt = require('bcrypt');
 
 const initDB = async () => {
-  try {
-    console.log("🔄 Initializing database tables...");
+    try {
+        console.log("🔄 Initializing database tables...");
 
-    // 1. Create Users Table
-    await pool.query(`
+        // 1. Create Users Table
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS users (
                 user_id SERIAL PRIMARY KEY,
                 username VARCHAR(50) UNIQUE NOT NULL,
@@ -22,8 +22,8 @@ const initDB = async () => {
             );
         `);
 
-    // 2. Create Categories Table
-    await pool.query(`
+        // 2. Create Categories Table
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS categories (
                 category_id SERIAL PRIMARY KEY,
                 category_name VARCHAR(100) UNIQUE NOT NULL,
@@ -36,8 +36,8 @@ const initDB = async () => {
             );
         `);
 
-    // 3. Create Admin Table (Optional, if used separately)
-    await pool.query(`
+        // 3. Create Admin Table (Optional, if used separately)
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS admin (
                 admin_id SERIAL PRIMARY KEY,
                 name VARCHAR(50),
@@ -50,8 +50,8 @@ const initDB = async () => {
             );
         `);
 
-    // 4. Create Complaints Table
-    await pool.query(`
+        // 4. Create Complaints Table
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS complaints (
                 complaint_id SERIAL PRIMARY KEY,
                 student_id INTEGER REFERENCES users(user_id) ON DELETE CASCADE,
@@ -69,8 +69,8 @@ const initDB = async () => {
             );
         `);
 
-    // 5. Create Status History Table
-    await pool.query(`
+        // 5. Create Status History Table
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS status_history (
                 history_id SERIAL PRIMARY KEY,
                 complaint_id INTEGER REFERENCES complaints(complaint_id),
@@ -81,8 +81,8 @@ const initDB = async () => {
             );
         `);
 
-    // 6. Create Feedback Table (Detailed feedback)
-    await pool.query(`
+        // 6. Create Feedback Table (Detailed feedback)
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS feedback (
                 feedback_id SERIAL PRIMARY KEY,
                 complaint_id INTEGER,
@@ -95,23 +95,33 @@ const initDB = async () => {
             );
         `);
 
-    // Seed Default Admin
-    const adminEmail = 'admin@college.edu';
-    const adminCheck = await pool.query("SELECT * FROM users WHERE email = $1", [adminEmail]);
+        // Seed Default Admin
+        const adminEmail = 'admin@college.edu';
+        const adminCheck = await pool.query("SELECT * FROM users WHERE email = $1", [adminEmail]);
 
-    if (adminCheck.rows.length === 0) {
-      const hashedPassword = await bcrypt.hash('admin123', 10);
-      await pool.query(`
+        if (adminCheck.rows.length === 0) {
+            const hashedPassword = await bcrypt.hash('admin123', 10);
+            await pool.query(`
                 INSERT INTO users (username, full_name, email, password_hash, role)
                 VALUES ($1, $2, $3, $4, $5)
             `, ['admin', 'System Admin', adminEmail, hashedPassword, 'admin']);
-      console.log("✅ Default admin account created: admin@college.edu / admin123");
-    }
 
-    console.log("✅ Database tables validated/created successfully!");
-  } catch (error) {
-    console.error("❌ Database initialization failed:", error);
-  }
+            // Also insert into admin table
+            const adminExists = await pool.query("SELECT * FROM admin WHERE email = $1", [adminEmail]);
+            if (adminExists.rows.length === 0) {
+                await pool.query(`
+                  INSERT INTO admin (name, email, password, role)
+                  VALUES ($1, $2, $3, $4)
+              `, ['System Admin', adminEmail, hashedPassword, 'admin']);
+            }
+
+            console.log("✅ Default admin account created: admin@college.edu / admin123");
+        }
+
+        console.log("✅ Database tables validated/created successfully!");
+    } catch (error) {
+        console.error("❌ Database initialization failed:", error);
+    }
 };
 
 module.exports = initDB;

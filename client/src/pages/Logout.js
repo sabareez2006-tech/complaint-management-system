@@ -1,22 +1,12 @@
 function Logout() {
   const handleLogout = () => {
     localStorage.clear();
-    window.location.reload(); // refresh UI
+    window.location.reload();
   };
 
   return (
-    <button
-      onClick={handleLogout}
-      style={{
-        background: "red",
-        color: "white",
-        padding: "8px 12px",
-        border: "none",
-        cursor: "pointer",
-        marginBottom: "10px",
-      }}
-    >
-      Logout
+    <button className="logout-btn" onClick={handleLogout}>
+      🚪 Logout
     </button>
   );
 }

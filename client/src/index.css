@@ -11,9 +11,60 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: var(--bg-gradient);
-  background-attachment: fixed; /* Ensures gradient covers full scroll */
+  background-attachment: fixed;
   color: var(--text-primary);
   min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Animated Background Orbs */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.15;
+  z-index: -1;
+  animation: floatOrb 20s ease-in-out infinite;
+}
+
+body::before {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, #667eea, transparent);
+  top: -200px;
+  right: -200px;
+  animation-delay: 0s;
+}
+
+body::after {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, #764ba2, transparent);
+  bottom: -150px;
+  left: -150px;
+  animation-delay: -10s;
+}
+
+@keyframes floatOrb {
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  25% {
+    transform: translate(50px, -80px) scale(1.1);
+  }
+
+  50% {
+    transform: translate(-30px, 60px) scale(0.95);
+  }
+
+  75% {
+    transform: translate(70px, 30px) scale(1.05);
+  }
 }
 
 code {
