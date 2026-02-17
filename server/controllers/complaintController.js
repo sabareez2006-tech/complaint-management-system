@@ -131,18 +131,37 @@ const addFeedback = async (req, res) => {
   try {
     const { id } = req.params;
     const { feedback, rating } = req.body;
+    console.log(`📝 addFeedback called: complaint_id=${id}, userId=${req.user.userId}, feedback="${feedback}"`);
+
+    // Ensure feedback column exists (migration for older databases)
+    try {
+      await pool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS feedback TEXT`);
+    } catch (migErr) {
+      console.warn("Feedback column migration skipped:", migErr.message);
+    }
 
     // Security: Only allow update if complaint belongs to student
-    const result = await pool.query(
-      `UPDATE complaints
-       SET feedback = $1
-       WHERE complaint_id = $2 AND student_id = $3
-       RETURNING *`,
-      [feedback, id, req.user.userId]
-    );
+    let result;
+    try {
+      result = await pool.query(
+        `UPDATE complaints
+         SET feedback = $1
+         WHERE complaint_id = $2 AND student_id = $3
+         RETURNING *`,
+        [feedback, id, req.user.userId]
+      );
+    } catch (updateErr) {
+      console.error("UPDATE complaints failed:", updateErr.message);
+      return res.status(500).json({ error: "Failed to update complaint: " + updateErr.message });
+    }
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Complaint not found or unauthorized" });
+      // Check if complaint exists at all
+      const exists = await pool.query(`SELECT complaint_id, student_id FROM complaints WHERE complaint_id = $1`, [id]);
+      if (exists.rows.length === 0) {
+        return res.status(404).json({ error: `Complaint #${id} not found` });
+      }
+      return res.status(403).json({ error: `Unauthorized: complaint belongs to student_id ${exists.rows[0].student_id}, your userId is ${req.user.userId}` });
     }
 
     // Also insert into the feedback table for detailed tracking
@@ -162,8 +181,8 @@ const addFeedback = async (req, res) => {
       complaint: result.rows[0],
     });
   } catch (error) {
-    console.error("ADD FEEDBACK ERROR:", error.message);
-    res.status(500).json({ error: "Server error" });
+    console.error("ADD FEEDBACK ERROR:", error.message, error.stack);
+    res.status(500).json({ error: "Server error: " + error.message });
   }
 };
 

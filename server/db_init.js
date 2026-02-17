@@ -77,6 +77,14 @@ const initDB = async () => {
             console.warn("Status constraint update skipped:", e.message);
         }
 
+        // Ensure feedback column exists on complaints table (migration for older databases)
+        try {
+            await pool.query(`ALTER TABLE complaints ADD COLUMN IF NOT EXISTS feedback TEXT`);
+            console.log("✅ Feedback column verified on complaints table");
+        } catch (e) {
+            console.warn("Feedback column migration skipped:", e.message);
+        }
+
         // 5. Create Status History Table
         await pool.query(`
             CREATE TABLE IF NOT EXISTS status_history (

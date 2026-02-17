@@ -59,7 +59,8 @@ function ComplaintList() {
       toast.success("Feedback submitted! Thank you 🙏");
       fetchComplaints();
     } catch (error) {
-      toast.error("Failed to submit feedback");
+      console.error("Feedback error:", error.response?.data || error.message);
+      toast.error(error.response?.data?.error || "Failed to submit feedback");
     }
   };
 
