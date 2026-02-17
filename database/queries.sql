@@ -1,7 +1,7 @@
 -- ============================================================
 --  COMPLAINT MANAGEMENT SYSTEM — APPLICATION QUERIES
 --  Description: All SQL queries used in the application
---  Organized by module: Auth, Complaints, Analytics
+--  Organized by module: Auth, Complaints, Categories, Feedback, Analytics
 -- ============================================================
 
 
@@ -62,55 +62,109 @@ RETURNING *;
 INSERT INTO status_history (complaint_id, old_status, new_status, changed_by)
 VALUES ($1, $2, $3, $4);
 
--- 2.8 ADD FEEDBACK (Student — only if complaint belongs to them)
+-- 2.8 ADD FEEDBACK TO COMPLAINT (Student — only if complaint belongs to them)
 UPDATE complaints
 SET feedback = $1
 WHERE complaint_id = $2 AND student_id = $3
 RETURNING *;
 
+-- 2.9 INSERT FEEDBACK INTO FEEDBACK TABLE (Detailed tracking)
+INSERT INTO feedback (complaint_id, user_id, rating, comments, status)
+VALUES ($1, $2, $3, $4, $5);
+
 
 -- =========================================================
---  MODULE 3: ANALYTICS (complaintController.js — getAnalytics)
+--  MODULE 3: CATEGORIES (complaintController.js)
 -- =========================================================
 
--- 3.1 TOTAL COMPLAINT COUNT
+-- 3.1 GET ALL ACTIVE CATEGORIES
+SELECT * FROM categories WHERE is_active = TRUE ORDER BY category_name ASC;
+
+-- 3.2 ADD NEW CATEGORY (Admin)
+INSERT INTO categories (category_name, description, department, priority_level)
+VALUES ($1, $2, $3, $4)
+RETURNING *;
+
+-- 3.3 UPDATE CATEGORY (Admin)
+UPDATE categories
+SET category_name = COALESCE($1, category_name),
+    description = COALESCE($2, description),
+    department = COALESCE($3, department),
+    priority_level = COALESCE($4, priority_level),
+    is_active = COALESCE($5, is_active),
+    updated_at = CURRENT_DATE
+WHERE category_id = $6
+RETURNING *;
+
+-- 3.4 DELETE CATEGORY — SOFT DELETE (Admin)
+UPDATE categories SET is_active = FALSE, updated_at = CURRENT_DATE
+WHERE category_id = $1 RETURNING *;
+
+
+-- =========================================================
+--  MODULE 4: FEEDBACK (complaintController.js)
+-- =========================================================
+
+-- 4.1 GET ALL FEEDBACK WITH DETAILS (Admin)
+SELECT f.*, c.title as complaint_title, u.full_name as user_name
+FROM feedback f
+LEFT JOIN complaints c ON f.complaint_id = c.complaint_id
+LEFT JOIN users u ON f.user_id = u.user_id
+ORDER BY f.feedback_date DESC;
+
+-- 4.2 FEEDBACK STATS (Analytics)
+SELECT COUNT(*) as total, AVG(rating) as avg_rating
+FROM feedback WHERE rating IS NOT NULL;
+
+
+-- =========================================================
+--  MODULE 5: ANALYTICS (complaintController.js — getAnalytics)
+-- =========================================================
+
+-- 5.1 TOTAL COMPLAINT COUNT
 SELECT COUNT(*) AS total FROM complaints;
 
--- 3.2 COUNT BY STATUS (pending, in_progress, resolved)
+-- 5.2 COUNT BY STATUS (pending, in_progress, resolved)
 SELECT status, COUNT(*) AS count
 FROM complaints
 GROUP BY status;
 
--- 3.3 COUNT BY CATEGORY
+-- 5.3 COUNT BY CATEGORY
 SELECT category, COUNT(*) AS count
 FROM complaints
 GROUP BY category
 ORDER BY count DESC;
 
--- 3.4 COUNT BY PRIORITY (high, medium, low)
+-- 5.4 COUNT BY PRIORITY (high, medium, low)
 SELECT priority, COUNT(*) AS count
 FROM complaints
 GROUP BY priority;
 
--- 3.5 RECENT COMPLAINTS — LAST 7 DAYS TIMELINE
+-- 5.5 RECENT COMPLAINTS — LAST 7 DAYS TIMELINE
 SELECT DATE(created_at) AS date, COUNT(*) AS count
 FROM complaints
 WHERE created_at >= NOW() - INTERVAL '7 days'
 GROUP BY DATE(created_at)
 ORDER BY date ASC;
 
--- 3.6 AVERAGE RESOLUTION TIME (in hours)
+-- 5.6 AVERAGE RESOLUTION TIME (in hours)
 SELECT AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 3600) AS avg_hours
 FROM complaints
 WHERE status = 'resolved' AND resolved_at IS NOT NULL;
 
 
 -- =========================================================
---  MODULE 4: DATABASE INITIALIZATION (db_init.js)
+--  MODULE 6: DATABASE INITIALIZATION (db_init.js)
 -- =========================================================
 
--- 4.1 CHECK IF DEFAULT ADMIN EXISTS
+-- 6.1 CHECK IF DEFAULT ADMIN EXISTS
 SELECT * FROM users WHERE email = $1;
 
--- 4.2 CHECK IF ADMIN EXISTS IN ADMIN TABLE
+-- 6.2 CHECK IF ADMIN EXISTS IN ADMIN TABLE
 SELECT * FROM admin WHERE email = $1;
+
+-- 6.3 SEED DEFAULT CATEGORIES (if categories table is empty)
+SELECT COUNT(*) FROM categories;
+INSERT INTO categories (category_name, description, department, priority_level)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (category_name) DO NOTHING;

@@ -130,7 +130,7 @@ const updateComplaintStatus = async (req, res) => {
 const addFeedback = async (req, res) => {
   try {
     const { id } = req.params;
-    const { feedback } = req.body;
+    const { feedback, rating } = req.body;
 
     // Security: Only allow update if complaint belongs to student
     const result = await pool.query(
@@ -145,6 +145,18 @@ const addFeedback = async (req, res) => {
       return res.status(404).json({ error: "Complaint not found or unauthorized" });
     }
 
+    // Also insert into the feedback table for detailed tracking
+    try {
+      await pool.query(
+        `INSERT INTO feedback (complaint_id, user_id, rating, comments, status)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [id, req.user.userId, rating || null, feedback, 'submitted']
+      );
+      console.log(`✅ Feedback recorded in feedback table for complaint #${id}`);
+    } catch (fbError) {
+      console.warn("Could not insert into feedback table:", fbError.message);
+    }
+
     res.json({
       message: "Feedback submitted",
       complaint: result.rows[0],
@@ -152,6 +164,123 @@ const addFeedback = async (req, res) => {
   } catch (error) {
     console.error("ADD FEEDBACK ERROR:", error.message);
     res.status(500).json({ error: "Server error" });
+  }
+};
+
+// GET ALL CATEGORIES
+const getCategories = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM categories WHERE is_active = TRUE ORDER BY category_name ASC`
+    );
+    res.json({ categories: result.rows });
+  } catch (error) {
+    console.error("GET CATEGORIES ERROR:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ADD CATEGORY (ADMIN)
+const addCategory = async (req, res) => {
+  try {
+    const { category_name, description, department, priority_level } = req.body;
+
+    if (!category_name) {
+      return res.status(400).json({ error: "Category name is required" });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO categories (category_name, description, department, priority_level)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [category_name, description || null, department || null, priority_level || null]
+    );
+
+    res.status(201).json({
+      message: "Category added successfully",
+      category: result.rows[0],
+    });
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(400).json({ error: "Category already exists" });
+    }
+    console.error("ADD CATEGORY ERROR:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// UPDATE CATEGORY (ADMIN)
+const updateCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { category_name, description, department, priority_level, is_active } = req.body;
+
+    const result = await pool.query(
+      `UPDATE categories
+       SET category_name = COALESCE($1, category_name),
+           description = COALESCE($2, description),
+           department = COALESCE($3, department),
+           priority_level = COALESCE($4, priority_level),
+           is_active = COALESCE($5, is_active),
+           updated_at = CURRENT_DATE
+       WHERE category_id = $6
+       RETURNING *`,
+      [category_name, description, department, priority_level, is_active, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Category not found" });
+    }
+
+    res.json({
+      message: "Category updated successfully",
+      category: result.rows[0],
+    });
+  } catch (error) {
+    console.error("UPDATE CATEGORY ERROR:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// DELETE CATEGORY (ADMIN - soft delete)
+const deleteCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      `UPDATE categories SET is_active = FALSE, updated_at = CURRENT_DATE
+       WHERE category_id = $1 RETURNING *`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Category not found" });
+    }
+
+    res.json({
+      message: "Category deleted successfully",
+      category: result.rows[0],
+    });
+  } catch (error) {
+    console.error("DELETE CATEGORY ERROR:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// GET ALL FEEDBACK (ADMIN)
+const getAllFeedback = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT f.*, c.title as complaint_title, u.full_name as user_name
+       FROM feedback f
+       LEFT JOIN complaints c ON f.complaint_id = c.complaint_id
+       LEFT JOIN users u ON f.user_id = u.user_id
+       ORDER BY f.feedback_date DESC`
+    );
+    res.json({ feedback: result.rows });
+  } catch (error) {
+    console.error("GET ALL FEEDBACK ERROR:", error.message);
+    res.status(500).json({ error: error.message });
   }
 };
 
@@ -212,6 +341,20 @@ const getAnalytics = async (req, res) => {
       ? parseFloat(avgTimeResult.rows[0].avg_hours).toFixed(1)
       : null;
 
+    // Feedback stats
+    let feedbackStats = { total: 0, avgRating: null };
+    try {
+      const fbResult = await pool.query(
+        `SELECT COUNT(*) as total, AVG(rating) as avg_rating FROM feedback WHERE rating IS NOT NULL`
+      );
+      feedbackStats.total = parseInt(fbResult.rows[0].total);
+      feedbackStats.avgRating = fbResult.rows[0].avg_rating
+        ? parseFloat(fbResult.rows[0].avg_rating).toFixed(1)
+        : null;
+    } catch (e) {
+      console.warn("Could not get feedback stats:", e.message);
+    }
+
     res.json({
       total,
       byStatus,
@@ -219,6 +362,7 @@ const getAnalytics = async (req, res) => {
       byPriority,
       recentTimeline,
       avgResolutionHours,
+      feedbackStats,
     });
   } catch (error) {
     console.error("GET ANALYTICS ERROR:", error.message);
@@ -233,4 +377,9 @@ module.exports = {
   updateComplaintStatus,
   addFeedback,
   getAnalytics,
+  getCategories,
+  addCategory,
+  updateCategory,
+  deleteCategory,
+  getAllFeedback,
 };

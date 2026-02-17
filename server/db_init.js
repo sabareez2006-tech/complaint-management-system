@@ -126,6 +126,31 @@ const initDB = async () => {
             console.log("✅ Default admin account created: admin@college.edu / admin123");
         }
 
+        // Seed default categories if none exist
+        const catCheck = await pool.query("SELECT COUNT(*) FROM categories");
+        if (parseInt(catCheck.rows[0].count) === 0) {
+            const defaultCategories = [
+                { name: 'Electrical', description: 'Electrical issues and maintenance', department: 'Maintenance', priority: 'high' },
+                { name: 'Hostel', description: 'Hostel related complaints', department: 'Hostel Admin', priority: 'medium' },
+                { name: 'Academic', description: 'Academic and course related issues', department: 'Academic', priority: 'medium' },
+                { name: 'Transport', description: 'Transport and bus related issues', department: 'Transport', priority: 'medium' },
+                { name: 'Canteen', description: 'Canteen and food related complaints', department: 'Canteen', priority: 'low' },
+                { name: 'Library', description: 'Library services and resources', department: 'Library', priority: 'low' },
+                { name: 'Lab', description: 'Lab equipment and facility issues', department: 'Lab Admin', priority: 'high' },
+                { name: 'Other', description: 'Other general complaints', department: null, priority: 'low' },
+            ];
+
+            for (const cat of defaultCategories) {
+                await pool.query(
+                    `INSERT INTO categories (category_name, description, department, priority_level)
+                     VALUES ($1, $2, $3, $4)
+                     ON CONFLICT (category_name) DO NOTHING`,
+                    [cat.name, cat.description, cat.department, cat.priority]
+                );
+            }
+            console.log("✅ Default categories seeded successfully!");
+        }
+
         console.log("✅ Database tables validated/created successfully!");
     } catch (error) {
         console.error("❌ Database initialization failed:", error);

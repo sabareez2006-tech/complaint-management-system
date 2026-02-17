@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import API from "../services/api";
 import { useToast } from "../components/Toast";
 
@@ -11,6 +11,31 @@ function Complaint() {
     priority: "medium",
   });
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState([]);
+
+  // Fetch categories from database
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await API.get("/complaints/categories");
+        setCategories(res.data.categories);
+      } catch (error) {
+        console.warn("Could not fetch categories from DB, using defaults");
+        // Fallback to hardcoded categories
+        setCategories([
+          { category_id: 1, category_name: "Electrical" },
+          { category_id: 2, category_name: "Hostel" },
+          { category_id: 3, category_name: "Academic" },
+          { category_id: 4, category_name: "Transport" },
+          { category_id: 5, category_name: "Canteen" },
+          { category_id: 6, category_name: "Library" },
+          { category_id: 7, category_name: "Lab" },
+          { category_id: 8, category_name: "Other" },
+        ]);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -40,17 +65,6 @@ function Complaint() {
       setLoading(false);
     }
   };
-
-  const categories = [
-    "Electrical",
-    "Hostel",
-    "Academic",
-    "Transport",
-    "Canteen",
-    "Library",
-    "Lab",
-    "Other",
-  ];
 
   return (
     <div>
@@ -87,8 +101,8 @@ function Complaint() {
         >
           <option value="">Select a category</option>
           {categories.map((cat) => (
-            <option key={cat} value={cat.toLowerCase()}>
-              {cat}
+            <option key={cat.category_id} value={cat.category_name.toLowerCase()}>
+              {cat.category_name}
             </option>
           ))}
         </select>
